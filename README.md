@@ -113,7 +113,43 @@ npm test
   - Tests user notification isolation and security boundaries (preventing unauthorized reading or marking others' notifications).
   - Tests notification deduplication and idempotent creation via unique `dedup_key`.
   - Tests RFC 5545 compliant `.ics` calendar export endpoint formatting (`DTSTART`, `DTEND`, `DTSTAMP`, `UID`, `SUMMARY`, `LOCATION`) and nonexistent event 404 handling.
+- **`security.audit.test.js`:** Tests cancellation concurrency serialization, notification parameter validation, PostgreSQL error translation, and event status lifecycle.
+- **`e2e.complete.verification.test.js`:** Comprehensive verification of live health check, complete student lifecycle (register $\rightarrow$ login $\rightarrow$ book $\rightarrow$ conflict rejection $\rightarrow$ notification $\rightarrow$ calendar .ics $\rightarrow$ cancel), organiser approval & capacity safety, admin workflows, and serialized cancellation integrity.
 - **`large.dataset.benchmark.js`:** Benchmark testing 5,000 bulk-inserted events with lateral subquery calculation and cursor pagination (sub-50ms query response times).
+
+---
+
+## Database Backup & Restoration
+
+### 1. PostgreSQL Backup (Docker or Local)
+```bash
+# Export full database dump
+docker exec -t campuspass-postgres-1 pg_dump -U campuspass -d campuspass -F c -b -v -f /tmp/campuspass_backup.dump
+docker cp campuspass-postgres-1:/tmp/campuspass_backup.dump ./campuspass_backup.dump
+```
+
+### 2. PostgreSQL Restoration
+```bash
+# Restore clean dump to database
+docker cp ./campuspass_backup.dump campuspass-postgres-1:/tmp/campuspass_backup.dump
+docker exec -t campuspass-postgres-1 pg_restore -U campuspass -d campuspass -c -v /tmp/campuspass_backup.dump
+```
+
+---
+
+## Production Deployment Checklist
+
+1. **Environment Variables:**
+   - Set `NODE_ENV=production`.
+   - Provide a cryptographically strong, random `JWT_ACCESS_SECRET` (at least 32 bytes).
+   - Set `CLIENT_ORIGIN` to the production domain (e.g. `https://campuspass.college.edu`).
+2. **Reverse Proxy & TLS:**
+   - Terminate SSL/TLS at your ingress/proxy (e.g. Nginx, Traefik, or AWS ALB).
+   - Express has `trust proxy` configured so rate limiting accurately uses the client's real IP from `X-Forwarded-For`.
+3. **Database Migrations:**
+   - The backend runs `migrate()` automatically upon startup before binding to port 3000, ensuring schema changes apply cleanly.
+4. **Health Probes:**
+   - Use `GET /api/v1/health` for container orchestration readiness checks; it validates real PostgreSQL and Redis connectivity.
 
 ---
 

@@ -2,6 +2,7 @@ import { app } from './app.js';
 import { env } from './config/env.js';
 import { pool } from './db/pool.js';
 import { redis } from './db/redis.js';
+import { migrate } from './db/migrate.js';
 
 const startServer = async () => {
   try {
@@ -9,6 +10,9 @@ const startServer = async () => {
     const client = await pool.connect();
     client.release();
     console.log('PostgreSQL connected successfully');
+
+    // Run pending database migrations
+    await migrate();
 
     // Verify Redis connection
     await redis.ping();
