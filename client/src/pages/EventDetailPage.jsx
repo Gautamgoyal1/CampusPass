@@ -203,13 +203,24 @@ export default function EventDetailPage() {
               </div>
 
               {!isPastEvent ? (
-                <BookButton
-                  eventId={event.id}
-                  seatsLeft={event.seats_left}
-                  hasBooked={event.hasBooked}
-                  onBookingSuccess={() => refetch()}
-                  onAnnouncement={setAnnouncement}
-                />
+                <>
+                  <BookButton
+                    eventId={event.id}
+                    seatsLeft={event.seats_left}
+                    hasBooked={event.hasBooked}
+                    onBookingSuccess={() => refetch()}
+                    onAnnouncement={setAnnouncement}
+                  />
+                  <a
+                    href={`/api/v1/events/${event.id}/calendar.ics`}
+                    download={`campuspass-event-${event.id}.ics`}
+                    className="btn btn-outline btn-block calendar-export-btn"
+                    style={{ marginTop: '0.75rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem' }}
+                    title="Export event to iCalendar (.ics)"
+                  >
+                    <span aria-hidden="true">📅</span> Add to Calendar (.ics)
+                  </a>
+                </>
               ) : (
                 <div className="badge badge-sold-out text-center" style={{ width: '100%', padding: '0.75rem' }}>
                   This event has ended

@@ -3,6 +3,7 @@ import authRoutes from './auth.routes.js';
 import eventsRoutes from './events.routes.js';
 import bookingsRoutes from './bookings.routes.js';
 import adminRoutes from './admin.routes.js';
+import notificationsRoutes from './notifications.routes.js';
 import eventController from '../controllers/event.controller.js';
 import bookingController from '../controllers/booking.controller.js';
 import { authenticate } from '../middleware/authenticate.js';
@@ -26,6 +27,10 @@ router.use('/bookings', bookingsRoutes);
 
 // Admin endpoints
 router.use('/admin', adminRoutes);
+
+// Notifications endpoints
+router.use('/notifications', notificationsRoutes);
+router.use('/me/notifications', notificationsRoutes);
 
 // Me endpoints
 router.get('/me/events', authenticate, requireRole('organiser', 'admin'), eventController.getMyEvents);

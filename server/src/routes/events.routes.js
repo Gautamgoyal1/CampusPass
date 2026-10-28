@@ -21,6 +21,20 @@ const bookingLimiter = rateLimit({ windowSeconds: 60, max: 30, keyPrefix: 'booki
 router.get('/', optionalAuthenticate, eventController.listEvents);
 router.get('/:id', optionalAuthenticate, validateParams(eventIdParamSchema), eventController.getEvent);
 
+// Calendar export (.ics)
+router.get(
+  '/:id/calendar.ics',
+  optionalAuthenticate,
+  validateParams(eventIdParamSchema),
+  eventController.exportEventIcs
+);
+router.get(
+  '/:id/ics',
+  optionalAuthenticate,
+  validateParams(eventIdParamSchema),
+  eventController.exportEventIcs
+);
+
 // Organiser / Admin event management
 router.post(
   '/',

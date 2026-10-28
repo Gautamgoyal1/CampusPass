@@ -9,6 +9,7 @@ export async function seed() {
     await client.query('BEGIN');
 
     // Clean existing seed tables safely in reverse dependency order
+    await client.query('DELETE FROM notifications');
     await client.query('DELETE FROM reviews');
     await client.query('DELETE FROM bookings');
     await client.query('DELETE FROM refresh_tokens');
@@ -21,6 +22,7 @@ export async function seed() {
     await client.query('ALTER SEQUENCE bookings_id_seq RESTART WITH 1');
     await client.query('ALTER SEQUENCE reviews_id_seq RESTART WITH 1');
     await client.query('ALTER SEQUENCE refresh_tokens_id_seq RESTART WITH 1');
+    await client.query('ALTER SEQUENCE notifications_id_seq RESTART WITH 1');
 
     // 1. Seed users
     const defaultPasswordHash = await bcrypt.hash('password123', 10);
@@ -158,6 +160,16 @@ export async function seed() {
         (${pastConcertId}, ${bobId}, 4, 'Really great music, sound system was clear and organized.')
     `);
     console.log('Seeded sample reviews.');
+
+    // 5. Seed sample notifications
+    await client.query(`
+      INSERT INTO notifications (user_id, event_id, booking_id, type, title, message, dedup_key, is_read)
+      VALUES
+        (${aliceId}, ${hackathonId}, 1, 'booking_confirmed', 'Booking Confirmed', 'Your seat for "Campus Hackathon 2026" is confirmed! See you at Engineering Building, Hall A.', 'seed:booking:1', false),
+        (${aliceId}, ${pastConcertId}, 2, 'booking_confirmed', 'Booking Confirmed', 'Your seat for "Spring Welcome Concert" was confirmed!', 'seed:booking:2', true),
+        (${bobId}, ${hackathonId}, 3, 'booking_confirmed', 'Booking Confirmed', 'Your seat for "Campus Hackathon 2026" is confirmed!', 'seed:booking:3', false)
+    `);
+    console.log('Seeded sample notifications.');
 
     await client.query('COMMIT');
     await invalidateEventCaches();

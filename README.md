@@ -108,7 +108,25 @@ npm test
   - Tests administrator self-demotion protection (`SELF_DEMOTION_PROHIBITED`, 403).
   - Tests capacity reduction safety guard against active bookings.
 - **`e2e.journeys.test.js`:** Full automated validation of all 5 user journeys (Visitor, Student, Organiser, Admin, and Reviews) against real PostgreSQL and Redis.
+- **`notifications.calendar.test.js`:**
+  - Tests in-app notification triggers on booking confirmation, student cancellation, organiser event time/venue updates, and admin/organiser event cancellation.
+  - Tests user notification isolation and security boundaries (preventing unauthorized reading or marking others' notifications).
+  - Tests notification deduplication and idempotent creation via unique `dedup_key`.
+  - Tests RFC 5545 compliant `.ics` calendar export endpoint formatting (`DTSTART`, `DTEND`, `DTSTAMP`, `UID`, `SUMMARY`, `LOCATION`) and nonexistent event 404 handling.
 - **`large.dataset.benchmark.js`:** Benchmark testing 5,000 bulk-inserted events with lateral subquery calculation and cursor pagination (sub-50ms query response times).
+
+---
+
+## Phase 6 API Additions
+
+### In-App Notifications
+- `GET /api/v1/notifications` — List notifications for authenticated user (supports `?unreadOnly=true`, `?limit=50`, `?offset=0`).
+- `GET /api/v1/notifications/unread-count` — Retrieve live unread notification count.
+- `PATCH /api/v1/notifications/:id/read` — Mark an individual notification as read.
+- `PATCH /api/v1/notifications/read-all` — Mark all unread notifications as read.
+
+### Calendar Export (.ics)
+- `GET /api/v1/events/:id/calendar.ics` (and `/api/v1/events/:id/ics`) — Download an RFC 5545 compliant iCalendar `.ics` file for importing directly into personal calendars (Google Calendar, Apple Calendar, Outlook).
 
 ---
 

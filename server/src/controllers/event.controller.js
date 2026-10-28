@@ -73,11 +73,23 @@ export const getMyStats = async (req, res, next) => {
   }
 };
 
+export const exportEventIcs = async (req, res, next) => {
+  try {
+    const { filename, content } = await eventService.generateEventIcs(req.params.id, req.user);
+    res.setHeader('Content-Type', 'text/calendar; charset=utf-8');
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+    res.status(200).send(content);
+  } catch (err) {
+    next(err);
+  }
+};
+
 export default {
   listEvents,
   getEvent,
   createEvent,
   updateEvent,
   getMyEvents,
-  getMyStats
+  getMyStats,
+  exportEventIcs
 };

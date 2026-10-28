@@ -376,9 +376,17 @@ export default function MyBookingsPage() {
                     </Link>
                   )}
 
-                  {/* Active upcoming booking cancellation handling */}
+                  {/* Active upcoming booking cancellation handling & calendar export */}
                   {!isCancelled && !isPast && (
                     <>
+                      <a
+                        href={`/api/v1/events/${booking.event_id}/calendar.ics`}
+                        download={`campuspass-event-${booking.event_id}.ics`}
+                        className="btn btn-outline btn-sm"
+                        title="Download .ics calendar event"
+                      >
+                        📅 Add to Calendar
+                      </a>
                       {canCancel ? (
                         <button
                           type="button"

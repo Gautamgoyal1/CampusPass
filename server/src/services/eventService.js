@@ -1,6 +1,7 @@
 import eventRepo from '../repositories/eventRepo.js';
 import bookingRepo from '../repositories/bookingRepo.js';
 import reviewRepo from '../repositories/reviewRepo.js';
+import notificationService from './notificationService.js';
 import { cacheGet, cacheSet, invalidateEventCaches } from '../db/redis.js';
 import { encodeCursor, decodeCursor } from '../utils/cursor.js';
 import { notFound, forbidden, badRequest } from '../utils/AppError.js';
@@ -94,6 +95,20 @@ export const updateEvent = async (id, updateData, user) => {
 
   const updated = await eventRepo.updateEvent(id, updateData);
   await invalidateEventCaches();
+
+  // If time or venue changed, notify all active booked students
+  const timeChanged =
+    (updateData.starts_at && new Date(updateData.starts_at).getTime() !== new Date(existing.starts_at).getTime()) ||
+    (updateData.ends_at && new Date(updateData.ends_at).getTime() !== new Date(existing.ends_at).getTime());
+  const venueChanged = updateData.venue && updateData.venue !== existing.venue;
+
+  if (timeChanged || venueChanged) {
+    const changes = [];
+    if (timeChanged) changes.push(`Scheduled time is now ${new Date(updated.starts_at).toLocaleString()}`);
+    if (venueChanged) changes.push(`Location moved to ${updated.venue}`);
+    await notificationService.notifyEventUpdated(updated, changes.join('; '));
+  }
+
   return updated;
 };
 
@@ -117,7 +132,73 @@ export const updateEventStatus = async (id, status, user) => {
 
   const updated = await eventRepo.updateEventStatus(id, status);
   await invalidateEventCaches();
+
+  if (status === 'rejected' || status === 'cancelled') {
+    await notificationService.notifyEventCancelled(id, existing.title);
+  }
+
   return updated;
+};
+
+export const generateEventIcs = async (eventId, currentUser = null) => {
+  const event = await eventRepo.findById(eventId);
+  if (!event) {
+    throw notFound('Event not found', 'NOT_FOUND');
+  }
+
+  if (event.status !== 'approved') {
+    const isOwner = currentUser && String(currentUser.id) === String(event.organiser_id);
+    const isAdmin = currentUser && currentUser.role === 'admin';
+    if (!isOwner && !isAdmin) {
+      throw notFound('Event not found', 'NOT_FOUND');
+    }
+  }
+
+  const formatIcsDate = (dateStr) => {
+    const d = new Date(dateStr);
+    return d.toISOString().replace(/[-:]/g, '').replace(/\.\d{3}/, '');
+  };
+
+  const escapeIcsText = (text) => {
+    if (!text) return '';
+    return String(text)
+      .replace(/\\/g, '\\\\')
+      .replace(/;/g, '\\;')
+      .replace(/,/g, '\\,')
+      .replace(/\r\n|\n|\r/g, '\\n');
+  };
+
+  const dtstamp = formatIcsDate(new Date());
+  const dtstart = formatIcsDate(event.starts_at);
+  const dtend = formatIcsDate(event.ends_at);
+  const uid = `event-${event.id}-${new Date(event.starts_at).getTime()}@campuspass.edu`;
+  const summary = escapeIcsText(event.title);
+  const description = escapeIcsText(event.description || '');
+  const location = escapeIcsText(event.venue || '');
+
+  const icsLines = [
+    'BEGIN:VCALENDAR',
+    'VERSION:2.0',
+    'PRODID:-//CampusPass//Event Calendar//EN',
+    'CALSCALE:GREGORIAN',
+    'METHOD:PUBLISH',
+    'BEGIN:VEVENT',
+    `UID:${uid}`,
+    `DTSTAMP:${dtstamp}`,
+    `DTSTART:${dtstart}`,
+    `DTEND:${dtend}`,
+    `SUMMARY:${summary}`,
+    `DESCRIPTION:${description}`,
+    `LOCATION:${location}`,
+    'STATUS:CONFIRMED',
+    'END:VEVENT',
+    'END:VCALENDAR'
+  ];
+
+  return {
+    filename: `campuspass-event-${event.id}.ics`,
+    content: icsLines.join('\r\n') + '\r\n'
+  };
 };
 
 export const getAdminEvents = async (options = {}) => {
@@ -139,6 +220,7 @@ export default {
   getOrganiserEvents,
   getOrganiserStats,
   updateEventStatus,
+  generateEventIcs,
   getAdminEvents,
   getPlatformStats
 };

@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Link, NavLink, Outlet, useNavigate } from 'react-router';
 import { useAuth } from '../auth/AuthContext.jsx';
+import NotificationCenter from './NotificationCenter.jsx';
 
 export default function Layout() {
   const { user, logout } = useAuth();
@@ -88,6 +89,7 @@ export default function Layout() {
             <div className="nav-auth-section">
               {user ? (
                 <div className="user-profile-menu">
+                  <NotificationCenter />
                   <span className="user-greeting">
                     <span className="user-name">{user.name}</span>
                     <span className="user-role-badge">{user.role}</span>

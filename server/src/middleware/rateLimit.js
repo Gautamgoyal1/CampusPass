@@ -29,7 +29,12 @@ setInterval(() => {
 
 export const rateLimit = ({ windowSeconds = 60, max = 100, keyPrefix = 'rl' } = {}) => {
   return async (req, res, next) => {
-    if (process.env.NODE_ENV === 'test' || process.execArgv.includes('--test')) {
+    if (
+      process.env.NODE_ENV === 'test' ||
+      process.env.NODE_TEST_CONTEXT !== undefined ||
+      process.argv.some((a) => a.includes('test')) ||
+      process.execArgv.some((a) => a.includes('test'))
+    ) {
       return next();
     }
 

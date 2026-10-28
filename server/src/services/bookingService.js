@@ -1,6 +1,7 @@
 import { pool } from '../db/pool.js';
 import bookingRepo from '../repositories/bookingRepo.js';
 import eventRepo from '../repositories/eventRepo.js';
+import notificationService from './notificationService.js';
 import {
   AppError,
   notFound,
@@ -16,6 +17,8 @@ export const bookSeat = async (eventId, user) => {
   }
 
   const client = await pool.connect();
+  let booking;
+  let bookedEvent;
   try {
     await client.query('BEGIN');
 
@@ -28,6 +31,7 @@ export const bookSeat = async (eventId, user) => {
     if (!event) {
       throw notFound('Event not found', 'NOT_FOUND');
     }
+    bookedEvent = event;
 
     if (event.status !== 'approved') {
       throw badRequest('Event is not open for booking', 'NOT_FOUND');
@@ -72,17 +76,12 @@ export const bookSeat = async (eventId, user) => {
     }
 
     // 6. Insert booking (protected also by partial unique index)
-    const booking = await bookingRepo.insertBooking(client, {
+    booking = await bookingRepo.insertBooking(client, {
       eventId,
       userId: user.id
     });
 
     await client.query('COMMIT');
-
-    // Invalidate event cache so seatsLeft is updated
-    await invalidateEventCaches();
-
-    return booking;
   } catch (err) {
     await client.query('ROLLBACK');
     if (err.code === '23505') {
@@ -92,6 +91,16 @@ export const bookSeat = async (eventId, user) => {
   } finally {
     client.release();
   }
+
+  // Invalidate event cache so seatsLeft is updated
+  await invalidateEventCaches();
+
+  // Create booking confirmed notification safely after commit
+  if (booking && bookedEvent) {
+    await notificationService.notifyBookingConfirmed(user.id, bookedEvent, booking);
+  }
+
+  return booking;
 };
 
 export const cancelBooking = async (bookingId, user) => {
@@ -121,6 +130,10 @@ export const cancelBooking = async (bookingId, user) => {
 
   const cancelled = await bookingRepo.cancelBooking(bookingId);
   await invalidateEventCaches();
+
+  // Notify student of cancellation
+  await notificationService.notifyBookingCancelled(user.id, booking);
+
   return cancelled;
 };
 
