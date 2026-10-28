@@ -1,5 +1,6 @@
 import eventRepo from '../repositories/eventRepo.js';
 import bookingRepo from '../repositories/bookingRepo.js';
+import reviewRepo from '../repositories/reviewRepo.js';
 import { cacheGet, cacheSet, invalidateEventCaches } from '../db/redis.js';
 import { encodeCursor, decodeCursor } from '../utils/cursor.js';
 import { notFound, forbidden, badRequest } from '../utils/AppError.js';
@@ -48,16 +49,19 @@ export const getEventDetails = async (id, currentUser = null) => {
   }
 
   let userBooking = null;
+  let userReview = null;
   if (currentUser) {
-    const { rows } = await eventRepo.findById(id); // booking check
     const bookings = await bookingRepo.findByUserId(currentUser.id);
     userBooking = bookings.find((b) => String(b.event_id) === String(id) && b.status === 'booked') || null;
+    userReview = await reviewRepo.findByEventAndUser(id, currentUser.id);
   }
 
   return {
     ...event,
     hasBooked: Boolean(userBooking),
-    bookingId: userBooking ? userBooking.id : null
+    bookingId: userBooking ? userBooking.id : null,
+    hasReviewed: Boolean(userReview),
+    userReview: userReview ? { rating: userReview.rating, comment: userReview.comment } : null
   };
 };
 

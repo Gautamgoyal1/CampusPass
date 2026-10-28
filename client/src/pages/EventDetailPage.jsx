@@ -8,6 +8,8 @@ import BookButton from '../components/BookButton.jsx';
 import LiveRegion from '../components/LiveRegion.jsx';
 import Skeleton from '../components/Skeleton.jsx';
 
+const DEFAULT_POSTER = 'https://images.unsplash.com/photo-1540575467063-178a50c2df87?auto=format&fit=crop&w=1200&q=80';
+
 export default function EventDetailPage() {
   const { id } = useParams();
   const { user } = useAuth();
@@ -43,6 +45,7 @@ export default function EventDetailPage() {
       queryClient.invalidateQueries({ queryKey: ['reviews', id] });
       queryClient.invalidateQueries({ queryKey: ['event', id] });
       setAnnouncement('Review submitted successfully!');
+      refetch();
     },
     onError: (err) => {
       setReviewError(err.message || 'Failed to submit review');
@@ -54,12 +57,12 @@ export default function EventDetailPage() {
     e.preventDefault();
     setReviewError(null);
     setReviewSuccess(false);
-    reviewMutation.mutate({ rating, comment });
+    reviewMutation.mutate({ rating, comment: comment.trim() || null });
   };
 
   if (isLoading) {
     return (
-      <div className="container page-container" style={{ maxWidth: '800px' }}>
+      <div className="container page-container" style={{ maxWidth: '840px' }}>
         <Skeleton height="350px" borderRadius="var(--radius-lg)" style={{ marginBottom: '1.5rem' }} />
         <Skeleton height="2.5rem" width="70%" style={{ marginBottom: '1rem' }} />
         <Skeleton height="1.25rem" width="40%" style={{ marginBottom: '2rem' }} />
@@ -73,7 +76,7 @@ export default function EventDetailPage() {
       <div className="container page-container text-center" style={{ padding: '4rem 1rem' }}>
         <h2>Event Not Found</h2>
         <p style={{ margin: '1rem 0 2rem', color: 'var(--text-secondary)' }}>
-          {error?.message || 'The event you are looking for does not exist or may have been removed.'}
+          {error?.message || 'The event you are looking for does not exist or may not be publicly approved.'}
         </p>
         <Link to="/" className="btn btn-primary">
           Back to Events
@@ -85,41 +88,56 @@ export default function EventDetailPage() {
   const startDate = new Date(event.starts_at);
   const endDate = new Date(event.ends_at);
   const isPastEvent = endDate < new Date();
+  const bookedPercent = Math.min(100, Math.max(0, ((event.capacity - event.seats_left) / event.capacity) * 100));
 
   return (
     <div className="container page-container detail-page-container">
       <LiveRegion message={announcement} />
 
+      {/* Breadcrumb Navigation */}
       <nav aria-label="Breadcrumb" className="breadcrumb">
         <Link to="/" className="breadcrumb-link">Events</Link>
         <span aria-hidden="true" className="breadcrumb-separator">/</span>
+        <span className="badge badge-category" style={{ marginRight: '0.5rem' }}>{event.category}</span>
         <span aria-current="page" className="breadcrumb-current">{event.title}</span>
       </nav>
 
       <article className="event-detail-card">
+        {/* Media Banner */}
         <div className="detail-media-container">
           <img
-            src={event.poster_url || 'https://images.unsplash.com/photo-1540575467063-178a50c2df87?auto=format&fit=crop&w=1200&q=80'}
-            alt={`Poster for ${event.title}`}
+            src={event.poster_url || DEFAULT_POSTER}
+            alt={`Cover banner for ${event.title}`}
             className="detail-poster-img"
+            onError={(e) => {
+              if (e.target.src !== DEFAULT_POSTER) {
+                e.target.src = DEFAULT_POSTER;
+              }
+            }}
           />
           <span className="badge badge-category detail-category-badge">{event.category}</span>
         </div>
 
+        {/* Header Section */}
         <div className="detail-header">
           <h1 className="detail-title">{event.title}</h1>
           <div className="detail-meta-row">
             <span className="organiser-info">
               Organised by <strong>{event.organiser_name}</strong>
             </span>
-            {event.average_rating && (
+            {event.average_rating ? (
               <span className="rating-badge">
-                ★ {event.average_rating} ({event.reviews_count} {event.reviews_count === 1 ? 'review' : 'reviews'})
+                ★ {Number(event.average_rating).toFixed(1)} ({event.reviews_count} {event.reviews_count === 1 ? 'review' : 'reviews'})
+              </span>
+            ) : (
+              <span className="text-muted" style={{ fontSize: '0.8125rem' }}>
+                No reviews yet
               </span>
             )}
           </div>
         </div>
 
+        {/* Content & Booking Grid */}
         <div className="detail-grid">
           <div className="detail-main-info">
             <section aria-labelledby="about-event-title" className="detail-section">
@@ -157,7 +175,7 @@ export default function EventDetailPage() {
                 <div className="info-card full-width">
                   <span className="info-icon" aria-hidden="true">📍</span>
                   <div>
-                    <strong className="info-heading">Venue</strong>
+                    <strong className="info-heading">Campus Venue</strong>
                     <p className="info-text">{event.venue}</p>
                   </div>
                 </div>
@@ -165,7 +183,8 @@ export default function EventDetailPage() {
             </section>
           </div>
 
-          <aside className="detail-sidebar" aria-label="Booking and Tickets">
+          {/* Action Sidebar */}
+          <aside className="detail-sidebar" aria-label="Seat Reservation Panel">
             <div className="ticket-card">
               <h3 className="ticket-card-title">Registration</h3>
 
@@ -177,9 +196,7 @@ export default function EventDetailPage() {
                 <div className="seat-progress-bar" aria-hidden="true">
                   <div
                     className="seat-progress-fill"
-                    style={{
-                      width: `${Math.min(100, Math.max(0, ((event.capacity - event.seats_left) / event.capacity) * 100))}%`
-                    }}
+                    style={{ width: `${bookedPercent}%` }}
                   />
                 </div>
                 <span className="capacity-label">Total capacity: {event.capacity} seats</span>
@@ -204,17 +221,39 @@ export default function EventDetailPage() {
 
         {/* Reviews Section */}
         <section className="reviews-section" aria-labelledby="reviews-section-title">
-          <h2 id="reviews-section-title" className="detail-section-title">
-            Student Reviews ({reviewsData?.length || 0})
-          </h2>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem', flexWrap: 'wrap', gap: '0.5rem' }}>
+            <h2 id="reviews-section-title" className="detail-section-title" style={{ margin: 0 }}>
+              Attendee Reviews ({reviewsData?.length || 0})
+            </h2>
+            {event.average_rating && (
+              <span className="rating-badge">
+                ★ {Number(event.average_rating).toFixed(1)} / 5.0
+              </span>
+            )}
+          </div>
 
-          {/* If event is past and user booked it, allow review */}
-          {isPastEvent && event.hasBooked && (
+          {/* User Review Status: Already reviewed */}
+          {event.hasReviewed && (
+            <div className="info-card" style={{ marginBottom: '1.5rem', backgroundColor: '#f0fdf4', borderColor: '#bbf7d0' }}>
+              <div>
+                <strong>✓ You have reviewed this event</strong>
+                {event.userReview && (
+                  <p style={{ marginTop: '0.25rem', color: 'var(--text-secondary)' }}>
+                    Your rating: {'★'.repeat(event.userReview.rating)}{'☆'.repeat(5 - event.userReview.rating)}
+                    {event.userReview.comment ? ` — "${event.userReview.comment}"` : ''}
+                  </p>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* Review submission form: Past event + Booked + Not yet reviewed */}
+          {isPastEvent && event.hasBooked && !event.hasReviewed && (
             <div className="review-form-card">
-              <h3 className="review-form-title">Leave a Review</h3>
+              <h3 className="review-form-title">Leave an Attendee Review</h3>
               {reviewSuccess && (
                 <p className="form-success" role="alert">
-                  Thank you! Your review has been submitted.
+                  Thank you! Your feedback has been posted.
                 </p>
               )}
               {reviewError && (
@@ -226,7 +265,7 @@ export default function EventDetailPage() {
               <form onSubmit={handleReviewSubmit}>
                 <div className="form-group">
                   <label htmlFor="review-rating" className="form-label">
-                    Rating (1 to 5 Stars)
+                    Star Rating (1 to 5 Stars)
                   </label>
                   <select
                     id="review-rating"
@@ -251,7 +290,7 @@ export default function EventDetailPage() {
                     rows="3"
                     value={comment}
                     onChange={(e) => setComment(e.target.value)}
-                    placeholder="Share your experience at this event..."
+                    placeholder="Share your experience, highlights, or feedback for future attendees..."
                     className="form-input form-textarea"
                   />
                 </div>
@@ -261,12 +300,20 @@ export default function EventDetailPage() {
                   disabled={reviewMutation.isPending}
                   className="btn btn-primary"
                 >
-                  {reviewMutation.isPending ? 'Submitting...' : 'Submit Review'}
+                  {reviewMutation.isPending ? 'Submitting Review...' : 'Submit Review'}
                 </button>
               </form>
             </div>
           )}
 
+          {/* Note if event is still active */}
+          {!isPastEvent && (
+            <p className="text-muted" style={{ fontSize: '0.875rem', marginBottom: '1rem' }}>
+              💬 Reviews will open for verified student attendees once this event has completed.
+            </p>
+          )}
+
+          {/* Reviews List */}
           <div className="reviews-list">
             {reviewsData && reviewsData.length > 0 ? (
               reviewsData.map((rev) => (
