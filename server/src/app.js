@@ -9,6 +9,9 @@ import { notFound } from './utils/AppError.js';
 
 export const app = express();
 
+// Trust reverse proxy headers (for accurate client IP in rate limiting behind Docker/Nginx/ALB)
+app.set('trust proxy', 1);
+
 // Security headers
 app.use(helmet());
 

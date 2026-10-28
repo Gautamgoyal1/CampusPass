@@ -35,7 +35,7 @@ export const errorHandler = (err, req, res, next) => {
     });
   }
 
-  // Database unique violation or foreign key error
+  // Database unique violation
   if (err.code === '23505') {
     return res.status(409).json({
       error: {
@@ -44,6 +44,45 @@ export const errorHandler = (err, req, res, next) => {
       },
       code: 'CONFLICT',
       message: 'Resource already exists or constraint violation',
+      status: 'error'
+    });
+  }
+
+  // Database foreign key violation
+  if (err.code === '23503') {
+    return res.status(400).json({
+      error: {
+        code: 'INVALID_REFERENCE',
+        message: 'Referenced entity does not exist or cannot be modified'
+      },
+      code: 'INVALID_REFERENCE',
+      message: 'Referenced entity does not exist or cannot be modified',
+      status: 'error'
+    });
+  }
+
+  // Database check constraint violation
+  if (err.code === '23514') {
+    return res.status(400).json({
+      error: {
+        code: 'CONSTRAINT_VIOLATION',
+        message: 'Database check constraint violation (e.g. invalid date range or capacity)'
+      },
+      code: 'CONSTRAINT_VIOLATION',
+      message: 'Database check constraint violation (e.g. invalid date range or capacity)',
+      status: 'error'
+    });
+  }
+
+  // Database invalid input syntax (e.g. invalid integer/bigint literal)
+  if (err.code === '22P02') {
+    return res.status(400).json({
+      error: {
+        code: 'INVALID_INPUT_SYNTAX',
+        message: 'Invalid parameter syntax for numeric identifier'
+      },
+      code: 'INVALID_INPUT_SYNTAX',
+      message: 'Invalid parameter syntax for numeric identifier',
       status: 'error'
     });
   }

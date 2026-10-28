@@ -112,11 +112,11 @@ export const findByIdWithEvent = async (bookingId) => {
   return rows[0] || null;
 };
 
-export const cancelBooking = async (bookingId) => {
-  const { rows } = await pool.query(
+export const cancelBooking = async (bookingId, client = pool) => {
+  const { rows } = await client.query(
     `UPDATE bookings
      SET status = 'cancelled', cancelled_at = now()
-     WHERE id = $1
+     WHERE id = $1 AND status = 'booked'
      RETURNING id, event_id, user_id, status, created_at, cancelled_at`,
     [bookingId]
   );

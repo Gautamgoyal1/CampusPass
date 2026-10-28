@@ -104,35 +104,61 @@ export const bookSeat = async (eventId, user) => {
 };
 
 export const cancelBooking = async (bookingId, user) => {
-  const booking = await bookingRepo.findByIdWithEvent(bookingId);
-  if (!booking) {
-    throw notFound('Booking not found', 'NOT_FOUND');
-  }
+  const client = await pool.connect();
+  let booking;
+  let cancelled;
+  try {
+    await client.query('BEGIN');
 
-  if (String(booking.user_id) !== String(user.id)) {
-    throw forbidden('You can only cancel your own bookings', 'FORBIDDEN');
-  }
-
-  if (booking.status === 'cancelled') {
-    throw badRequest('Booking is already cancelled', 'ALREADY_CANCELLED');
-  }
-
-  const startsAt = new Date(booking.event_starts_at).getTime();
-  const now = Date.now();
-  const twoHoursMs = 2 * 60 * 60 * 1000;
-
-  if (startsAt - now < twoHoursMs) {
-    throw conflict(
-      'Bookings cannot be cancelled less than 2 hours before the event starts',
-      'CANCEL_WINDOW_CLOSED'
+    // Row-level lock on the booking row to strictly serialize concurrent cancellation attempts
+    const { rows } = await client.query(
+      `SELECT b.*, e.title AS event_title, e.starts_at AS event_starts_at
+       FROM bookings b
+       JOIN events e ON e.id = b.event_id
+       WHERE b.id = $1
+       FOR UPDATE`,
+      [bookingId]
     );
+    booking = rows[0];
+
+    if (!booking) {
+      throw notFound('Booking not found', 'NOT_FOUND');
+    }
+
+    if (String(booking.user_id) !== String(user.id)) {
+      throw forbidden('You can only cancel your own bookings', 'FORBIDDEN');
+    }
+
+    if (booking.status === 'cancelled') {
+      throw badRequest('Booking is already cancelled', 'ALREADY_CANCELLED');
+    }
+
+    const startsAt = new Date(booking.event_starts_at).getTime();
+    const now = Date.now();
+    const twoHoursMs = 2 * 60 * 60 * 1000;
+
+    if (startsAt - now < twoHoursMs) {
+      throw conflict(
+        'Bookings cannot be cancelled less than 2 hours before the event starts',
+        'CANCEL_WINDOW_CLOSED'
+      );
+    }
+
+    cancelled = await bookingRepo.cancelBooking(bookingId, client);
+    await client.query('COMMIT');
+  } catch (err) {
+    await client.query('ROLLBACK');
+    throw err;
+  } finally {
+    client.release();
   }
 
-  const cancelled = await bookingRepo.cancelBooking(bookingId);
   await invalidateEventCaches();
 
-  // Notify student of cancellation
-  await notificationService.notifyBookingCancelled(user.id, booking);
+  // Notify student of cancellation safely after commit
+  if (booking) {
+    await notificationService.notifyBookingCancelled(user.id, booking);
+  }
 
   return cancelled;
 };

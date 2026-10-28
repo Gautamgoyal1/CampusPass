@@ -16,6 +16,7 @@ import { rateLimit } from '../middleware/rateLimit.js';
 const router = Router();
 
 const bookingLimiter = rateLimit({ windowSeconds: 60, max: 30, keyPrefix: 'booking' });
+const reviewLimiter = rateLimit({ windowSeconds: 60, max: 15, keyPrefix: 'review' });
 
 // Public event listing and details
 router.get('/', optionalAuthenticate, eventController.listEvents);
@@ -78,6 +79,7 @@ router.post(
   authenticate,
   requireRole('student'),
   validateParams(eventIdParamSchema),
+  reviewLimiter,
   validateBody(reviewSchema),
   reviewController.createReview
 );
