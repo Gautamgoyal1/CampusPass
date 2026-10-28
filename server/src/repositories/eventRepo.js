@@ -204,14 +204,68 @@ export const findByOrganiserId = async (organiserId) => {
   return rows;
 };
 
-export const findAdminEvents = async ({ status = 'pending', limit = 50, offset = 0 } = {}) => {
+export const getOrganiserStats = async (organiserId) => {
+  const queryText = `
+    SELECT
+      COUNT(*)::int AS total_events,
+      COUNT(*) FILTER (WHERE status = 'approved')::int AS approved_events,
+      COUNT(*) FILTER (WHERE status = 'pending')::int AS pending_events,
+      COUNT(*) FILTER (WHERE status = 'rejected')::int AS rejected_events,
+      COALESCE(SUM(booked_count), 0)::int AS total_active_bookings
+    FROM (
+      SELECT e.id, e.status, COUNT(b.id) FILTER (WHERE b.status = 'booked') AS booked_count
+      FROM events e
+      LEFT JOIN bookings b ON b.event_id = e.id
+      WHERE e.organiser_id = $1
+      GROUP BY e.id, e.status
+    ) sub
+  `;
+  const { rows } = await pool.query(queryText, [organiserId]);
+  return rows[0] || {
+    total_events: 0,
+    approved_events: 0,
+    pending_events: 0,
+    rejected_events: 0,
+    total_active_bookings: 0
+  };
+};
+
+export const getPlatformStats = async () => {
+  const queryText = `
+    SELECT
+      (SELECT COUNT(*)::int FROM users) AS total_users,
+      (SELECT COUNT(*)::int FROM users WHERE role = 'student') AS total_students,
+      (SELECT COUNT(*)::int FROM users WHERE role = 'organiser') AS total_organisers,
+      (SELECT COUNT(*)::int FROM events) AS total_events,
+      (SELECT COUNT(*)::int FROM events WHERE status = 'pending') AS pending_events,
+      (SELECT COUNT(*)::int FROM events WHERE status = 'approved') AS approved_events,
+      (SELECT COUNT(*)::int FROM events WHERE status = 'rejected') AS rejected_events,
+      (SELECT COUNT(*)::int FROM bookings WHERE status = 'booked') AS total_active_bookings
+  `;
+  const { rows } = await pool.query(queryText);
+  return rows[0];
+};
+
+export const findAdminEvents = async ({ status = 'pending', category, search, limit = 50, offset = 0 } = {}) => {
   const params = [];
-  let whereClause = '';
+  const conditions = [];
 
   if (status && status !== 'all') {
     params.push(status);
-    whereClause = `WHERE e.status = $${params.length}`;
+    conditions.push(`e.status = $${params.length}`);
   }
+
+  if (category && category !== 'all') {
+    params.push(category);
+    conditions.push(`e.category = $${params.length}`);
+  }
+
+  if (search && search.trim()) {
+    params.push(`%${search.trim()}%`);
+    conditions.push(`(e.title ILIKE $${params.length} OR e.venue ILIKE $${params.length} OR u.name ILIKE $${params.length} OR u.email ILIKE $${params.length})`);
+  }
+
+  const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
 
   params.push(limit, offset);
   const queryText = `
@@ -252,5 +306,7 @@ export default {
   updateEvent,
   updateEventStatus,
   findByOrganiserId,
-  findAdminEvents
+  findAdminEvents,
+  getOrganiserStats,
+  getPlatformStats
 };

@@ -102,6 +102,11 @@ npm test
 - **`schedule.conflict.test.js`:**
   - Tests 9 discrete schedule conflict interval scenarios (strict overlap rejection, adjacent start/end boundaries permitted, cancelled bookings ignored, separate days permitted).
   - Tests 3 concurrency serialization scenarios using PostgreSQL transaction advisory locks (`SELECT pg_advisory_xact_lock(user_id)`): concurrent overlapping bookings by the same student serialize with exactly 1 success and 1 `SCHEDULE_CONFLICT` (409); simultaneous non-overlapping bookings both succeed; distinct students booking the same event both succeed.
+- **`dashboard.test.js`:**
+  - Tests live metrics endpoints (`GET /me/stats`, `GET /admin/stats`).
+  - Tests admin user management with search, role filtering, and pagination.
+  - Tests administrator self-demotion protection (`SELF_DEMOTION_PROHIBITED`, 403).
+  - Tests capacity reduction safety guard against active bookings.
 - **`e2e.journeys.test.js`:** Full automated validation of all 5 user journeys (Visitor, Student, Organiser, Admin, and Reviews) against real PostgreSQL and Redis.
 - **`large.dataset.benchmark.js`:** Benchmark testing 5,000 bulk-inserted events with lateral subquery calculation and cursor pagination (sub-50ms query response times).
 

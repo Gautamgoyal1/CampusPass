@@ -11,6 +11,7 @@ const router = Router();
 
 router.use(authenticate, requireRole('admin'));
 
+router.get('/stats', adminController.getPlatformStats);
 router.get('/events', adminController.getAdminEvents);
 router.patch('/events/:id/status', validateParams(eventIdParamSchema), validateBody(updateEventStatusSchema), adminController.updateEventStatus);
 router.patch('/users/:id/role', validateParams(bookingIdParamSchema), validateBody(updateRoleSchema), adminController.updateUserRole);

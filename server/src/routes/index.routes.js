@@ -29,6 +29,7 @@ router.use('/admin', adminRoutes);
 
 // Me endpoints
 router.get('/me/events', authenticate, requireRole('organiser', 'admin'), eventController.getMyEvents);
+router.get('/me/stats', authenticate, requireRole('organiser', 'admin'), eventController.getMyStats);
 router.get('/me/bookings', authenticate, requireRole('student'), bookingController.getMyBookings);
 
 export default router;

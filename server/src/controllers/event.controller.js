@@ -61,10 +61,23 @@ export const getMyEvents = async (req, res, next) => {
   }
 };
 
+export const getMyStats = async (req, res, next) => {
+  try {
+    const stats = await eventService.getOrganiserStats(req.user.id);
+    res.status(200).json({
+      status: 'success',
+      data: { stats }
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
 export default {
   listEvents,
   getEvent,
   createEvent,
   updateEvent,
-  getMyEvents
+  getMyEvents,
+  getMyStats
 };

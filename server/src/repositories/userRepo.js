@@ -37,15 +37,36 @@ export const updateRole = async (id, role) => {
   return rows[0] || null;
 };
 
-export const findAllUsers = async ({ limit = 50, offset = 0 } = {}) => {
-  const { rows } = await pool.query(
-    `SELECT id, name, email, role, created_at
-     FROM users
-     ORDER BY id ASC
-     LIMIT $1 OFFSET $2`,
-    [limit, offset]
-  );
-  return rows;
+export const findAllUsers = async ({ search = '', role = '', limit = 20, offset = 0 } = {}) => {
+  const conditions = [];
+  const params = [];
+
+  if (search && search.trim()) {
+    params.push(`%${search.trim()}%`);
+    conditions.push(`(name ILIKE $${params.length} OR email ILIKE $${params.length})`);
+  }
+
+  if (role && role !== 'all') {
+    params.push(role);
+    conditions.push(`role = $${params.length}`);
+  }
+
+  const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
+
+  const countQuery = `SELECT COUNT(*)::int AS total FROM users ${whereClause}`;
+  const countResult = await pool.query(countQuery, params);
+  const total = countResult.rows[0]?.total || 0;
+
+  const queryParams = [...params, limit, offset];
+  const queryText = `
+    SELECT id, name, email, role, created_at
+    FROM users
+    ${whereClause}
+    ORDER BY created_at DESC, id DESC
+    LIMIT $${queryParams.length - 1} OFFSET $${queryParams.length}
+  `;
+  const { rows } = await pool.query(queryText, queryParams);
+  return { users: rows, total };
 };
 
 export default {

@@ -19,7 +19,9 @@ CampusPass defines four system roles: **Visitor** (unauthenticated), **Student**
 | **Create event** (`POST /events`) | ❌ (401) | ❌ (403) | ✅ (Starts pending) | ✅ |
 | **Edit owned event** (`PATCH /events/:id`) | ❌ (401) | ❌ (403) | ✅ (Own events only) | ✅ (Any event) |
 | **View owned events** (`GET /me/events`) | ❌ (401) | ❌ (403) | ✅ | ✅ |
+| **View organiser analytics** (`GET /me/stats`) | ❌ (401) | ❌ (403) | ✅ | ✅ |
 | **View attendee list** (`GET /events/:id/bookings`) | ❌ (401) | ❌ (403) | ✅ (Own events only) | ✅ (Any event) |
+| **View platform metrics** (`GET /admin/stats`) | ❌ (401) | ❌ (403) | ❌ (403) | ✅ |
 | **View pending events** (`GET /admin/events`) | ❌ (401) | ❌ (403) | ❌ (403) | ✅ |
 | **Approve / Reject event** (`PATCH /admin/events/:id/status`) | ❌ (401) | ❌ (403) | ❌ (403) | ✅ |
 | **Manage user roles** (`PATCH /admin/users/:id/role`) | ❌ (401) | ❌ (403) | ❌ (403) | ✅ |
@@ -32,8 +34,11 @@ CampusPass defines four system roles: **Visitor** (unauthenticated), **Student**
    - Public registration (`/auth/register`) strictly sets `role = 'student'` regardless of request payload.
    - Organiser and Admin roles can only be granted by existing Admins via `PATCH /api/v1/admin/users/:id/role`.
 
-2. **Ownership Check on Event Modifications:**
+2. **Self-Demotion Protection:**
+   - An administrator attempting to remove their own admin role via `PATCH /api/v1/admin/users/:id/role` receives `403 FORBIDDEN` with code `SELF_DEMOTION_PROHIBITED`.
+
+3. **Ownership Check on Event Modifications:**
    - An organiser attempting to update or view attendees of an event not owned by them receives `403 FORBIDDEN`.
 
-3. **Ownership Check on Booking Cancellation:**
+4. **Ownership Check on Booking Cancellation:**
    - A student attempting to cancel another user's booking receives `403 FORBIDDEN`.

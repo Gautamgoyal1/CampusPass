@@ -2,7 +2,8 @@ import eventRepo from '../repositories/eventRepo.js';
 import bookingRepo from '../repositories/bookingRepo.js';
 import { cacheGet, cacheSet, invalidateEventCaches } from '../db/redis.js';
 import { encodeCursor, decodeCursor } from '../utils/cursor.js';
-import { notFound, forbidden } from '../utils/AppError.js';
+import { notFound, forbidden, badRequest } from '../utils/AppError.js';
+import { pool } from '../db/pool.js';
 
 export const getPublicEvents = async ({ search = '', category = '', cursor = null, limit = 10 }) => {
   const cacheKey = `events:list:${search}:${category}:${cursor || 'start'}:${limit}`;
@@ -80,6 +81,13 @@ export const updateEvent = async (id, updateData, user) => {
     throw forbidden('You are not authorized to edit this event', 'FORBIDDEN');
   }
 
+  if (updateData.capacity !== undefined) {
+    const activeCount = await bookingRepo.countActiveBookings(pool, id);
+    if (Number(updateData.capacity) < activeCount) {
+      throw badRequest(`Cannot reduce capacity below current active bookings (${activeCount})`, 'INVALID_CAPACITY');
+    }
+  }
+
   const updated = await eventRepo.updateEvent(id, updateData);
   await invalidateEventCaches();
   return updated;
@@ -87,6 +95,10 @@ export const updateEvent = async (id, updateData, user) => {
 
 export const getOrganiserEvents = async (organiserId) => {
   return eventRepo.findByOrganiserId(organiserId);
+};
+
+export const getOrganiserStats = async (organiserId) => {
+  return eventRepo.getOrganiserStats(organiserId);
 };
 
 export const updateEventStatus = async (id, status, user) => {
@@ -104,8 +116,15 @@ export const updateEventStatus = async (id, status, user) => {
   return updated;
 };
 
-export const getAdminEvents = async (status = 'pending') => {
-  return eventRepo.findAdminEvents({ status });
+export const getAdminEvents = async (options = {}) => {
+  if (typeof options === 'string') {
+    return eventRepo.findAdminEvents({ status: options });
+  }
+  return eventRepo.findAdminEvents(options);
+};
+
+export const getPlatformStats = async () => {
+  return eventRepo.getPlatformStats();
 };
 
 export default {
@@ -114,6 +133,8 @@ export default {
   createEvent,
   updateEvent,
   getOrganiserEvents,
+  getOrganiserStats,
   updateEventStatus,
-  getAdminEvents
+  getAdminEvents,
+  getPlatformStats
 };
